@@ -13,6 +13,7 @@ fun s:iris_stuff()
     syn match texMathSymbol '\\mask' contained conceal cchar=𝓔
     syn match texMathSymbol '\\I' contained conceal cchar=𝓘
     syn match texMathSymbol '\\N' contained conceal cchar=𝓝
+    syn match texMathSymbol '\\namesp' contained conceal cchar=𝓝
     syn match texMathSymbol '\\mval' contained conceal cchar=𝓥
     syn match texMathSymbol '\\mvalFull' contained conceal cchar=𝓥
 endfun
