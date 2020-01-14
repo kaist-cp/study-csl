@@ -2,7 +2,7 @@
 title: An Overview of Concurrent Separation Logic and Iris
 author: Jaehwang Jung
 institute: KAIST CP
-date: "2019-12-31, 2020-01-07"
+date: "2019-12-31, 2020-01-07, 2020-01-14"
 theme: metropolis
 toc: true
 slide_level: 2
@@ -30,7 +30,7 @@ What's your goal?
     * [**tutorial-POPL18**](https://gitlab.mpi-sws.org/iris/tutorial-popl18)
     * [**Lecture Notes**](https://iris-project.org/tutorial-material.html)
     * [Iris examples](https://gitlab.mpi-sws.org/iris/examples)
-    * [Ground-Up (theories)](https://people.mpi-sws.org/~dreyer/papers/iris-ground-up/paper.pdf)
+    * [Iris from the ground up (theories)](https://people.mpi-sws.org/~dreyer/papers/iris-ground-up/paper.pdf)
     * [documentations](https://gitlab.mpi-sws.org/iris/iris/tree/master/docs):
       Iris Proof Mode, Heap lang, editor setups, ...
 
@@ -43,7 +43,7 @@ What's your goal?
     * [CACM 2019-2](https://cacm.acm.org/magazines/2019/2/234356-separation-logic/pdf)
 * [Formal Reasoning About Programs](https://frap.csail.mit.edu/main)
 
-# Basics of (sequential) separation logic
+# Basics of (Sequential) Separation Logic
 
 ## Hoare Logic
 A logic for proving program specifications (a.k.a. Hoare triples) of form
@@ -57,13 +57,9 @@ $$
 $$
 \hoare{x=0,y=1}{\texttt{x := x + 1; y := x + y}}{x=1,y=2}
 $$
-How to prove the specification?
+How to prove the specification systematically?
 
 ## Hoare Logic Inference Rules
-Under the assumptions $H_0,...,H_n$ we can derive $C$:
-$$
-\infer{ H_0\\ \cdots \\ H_n } { C }
-$$
 Hoare logic inference rules for each programming language construct:
 $$
 \infer [HOARE-SEQ] {
@@ -81,7 +77,7 @@ $$
     \hoare{P}{\texttt{if (e) b0 else b1}}{Q}
 }
 $$
-Note that inference rules themselves should be proved sound \wrt the semantics of the language.
+Note: inference rules themselves should be proved sound \wrt the semantics of the language.
 
 ## Separation Logic
 Problem: Hoare logic doesn't work well for _large_ programs involving _pointers_ (shared mutable states $\to$ lots of interference to consider).
@@ -146,27 +142,16 @@ Note
 * $P\ast Q\proves P\land Q$
 * $P\land Q\proves P\ast Q$ if $P$ _persistent_
 
-# Separation logic in Iris Proof Mode
-
-## Demo: POPL18 tutorial `exercises/ex_01_swap.v`
+## Demo 1: POPL18 tutorial `exercises/ex_01_swap.v`
 <https://gitlab.mpi-sws.org/iris/tutorial-popl18>
 
-### Texan triples?
-```
-{{{ P }}} e {{{ RET v, Q }}}
-```
-$\,$ <!-- the padding above the quot is too small -->
+# Separation Logic of Iris
 
-> I think "Texan triple" would be a good name, seeing how everything is bigger
-> in Texas, including the number of curly braces.
->
-> -- [Janno](https://gitlab.mpi-sws.org/iris/iris/merge_requests/9#nomenclature)
-
-## Where did my Texan triple go? (1/2)
-* It's just a notation:
+## Encoding of Hoare triples (a.k.a. [Texan triples](https://gitlab.mpi-sws.org/iris/iris/merge_requests/9#nomenclature))
 $$
 \hoare{P}{e}{v,Q}\triangleq \always(P\wand \wpre{e}{v,Q})
 $$
+
 * $\wpre{e}{v,Q}$?: the weakest(most general) precondition of program $e$ and postcondition $Q$
     * why? systematic proof process. (`wp_*` tactics)
     * Start with the postcondition, go backwards, and try to get to something the precondition implies
@@ -197,12 +182,13 @@ $$
     \wpre\expr{\Ret\var.Q}}
 $$
 
-## Where did my Texan triple go? (2/2)
-* another equivalence (continuation)
+## Encoding of Hoare triples (cont.)
+Another equivalence (continuation)
 \begin{align*}
 \hoare{P}{e}{v,Q}&\triangleq \always(P\wand \wpre{e}{v,Q})\\&\cong
 \always(\forall\Phi, P\wand (Q\wand \Phi\,v) \wand \wpre{e}{v,\Phi\, v})
 \end{align*}
+
 * why? convenience of application of the spec to other proofs
 
 ## `wp_bind`
@@ -221,7 +207,7 @@ $$
 
 ## Modalities: "later" $\later$
 * $\later P$ holds if $P$ holds after a reduction step
-* why? logical soundness
+* why? logical soundness (details in "group up" paper)
 * introduction
     * weaken: $P\proves \later P$, `iNext` tactic
     * opening invariants
@@ -232,7 +218,7 @@ $$
         * HT-FRAME-ATOMIC
     * timeless (propositions that doesn't refer to other invariants, most of innocent propositions): FUP-TIMELESS, `> ipat` intro pattern
 
-## Lőb induction
+## Löb induction
 $$
 \infer[Lőb]{Q\land\later P\proves P}{Q\proves P}
 $$
@@ -255,17 +241,7 @@ resources required by $e$ are contained in $P$.
 
 \todo
 
-
-# Concurrent Separation Logic
-
-## Today's goal
-Prove
-$$
-\hoare{l\mapsto 0}{(l\leftarrow 0 || l\leftarrow 1); !l}{v.v=0\lor v=1}
-$$
-
-How? [lecture 9: invariants](https://iris-project.org/tutorial-pdfs/lecture9-invariants.pdf)
-
+# Concurrent Separation Logic: \ Invariants
 
 ## Invariant $\knowInv{\iota}{P}$
 * Shareable knowledge that there exists a resource satisfying $P$ (think: pointer)
@@ -312,13 +288,6 @@ $$
 }
 $$
 
-# Concurrent Separation Logic in Iris Proof Mode
-
-## Demo: coin flip
-<!-- <https://gitlab.mpi-sws.org/iris/examples/blob/master/theories/lecture_notes/coq_intro_example_1.v> -->
-<https://gitlab.mpi-sws.org/iris/tutorial-popl18/blob/master/talks/demo/part3.v>
-
-
 ## Invariants + weakest preconditions
 $$
 \infer{
@@ -340,7 +309,7 @@ $$
 }
 $$
 
-* INV-ALLOC?: Soon^TM^
+* INV-ALLOC?: Soon
 <!-- WP-FRAME-STEP (lecture note 113, not necessarily atomic, but at least reducible) -->
 
 ##
@@ -434,6 +403,205 @@ proof? why is this necessary and how is it difference from timeless stuff??  -->
 <!-- ground up figure 4 -->
 
 <!-- how to connect the result of timeless stuff to proof? ok to eliminate? frame-preseving update? -->
+
+
+# Concurrent Separation Logic: \ Ghost States
+
+## Today's Goal
+
+\footnotesize
+```ocaml
+(* Example from "Iris from the ground up" section 2 *)
+mk_oneshot () = let x = ref(None) in
+(* CAS(loc, cur, new): atomically Compare `!loc` and `cur`
+   And Set it to `new` if they are the same *)
+    { try_set = fun n -> CAS(x, None, Some(n)),
+      check = fun () ->
+        let y = !x in
+        fun () ->
+            match y, !x with
+            | None, _ => ()
+            | Some(n), None => assert(false)
+            | Some(n), Some(m) => assert(n == m)
+            end }
+```
+
+* Allocates a location that can be set only once by `c.try_set`.
+* `c.check()` takes a snapshot of the value and `c.check()()` crashes if the current value differs from the snapshot.
+
+\normalsize
+
+## Today's Goal
+
+\footnotesize
+
+```ocaml
+mk_oneshot () = let x = ref(None) in
+    { try_set = fun n -> CAS(x, None, Some(n)),
+      check = fun () ->
+        let y = !x in
+        fun () ->
+            match y, !x with
+            | None, _ => ()
+            | Some(n), None => assert(false)
+            | Some(n), Some(m) => assert(n == m)
+            end
+    }
+```
+
+Prove that `c.check()()` does not crash.
+$$
+\{\TRUE\}\ \texttt{mk\_oneshot()} \left\{ c, \forall v.
+    \begin{array}{l}
+    \hoare{\TRUE}{\texttt{c.tryset(v)}}{w, w\in \{\texttt{true},\texttt{false}\}} \ast\\
+    \hoare{\TRUE}{\texttt{c.check()}}{f, \hoare{\TRUE}{\texttt{f()}}{\TRUE}}\\
+    \end{array}
+\right\}
+$$
+
+\normalsize
+
+## Key points
+* Problem 1: Sharing of $x\mapsto v$ among multiple threads.
+    * Use an invariant containing $x\mapsto v$.
+* Problem 2: Guaranteeing that the value of $x\mapsto \texttt{Some(n)}$ cannot change.
+    * There are 2 _logical_ states of the program associated to the physical state $x\mapsto v$.
+        * In the initial $\textsf{NotSet}$ state, `c.try_set(v)` succeeds and updates the state to $\textsf{Set}(v)$ state.
+        * Once the state becomes $\textsf{Some}(v)$, the state doesn't change anymore.
+
+## High-level proof idea
+\scriptsize
+```ocaml
+mk_oneshot () =
+    let x = ref(None) in (* Initiate the logical state to NotSet *)
+    { try_set = fun n ->
+        CAS(x, None, Some(n)), (* Update the state to Set(n) *)
+      check = fun () ->
+        (* Record the snapshot of the state *)
+        let y = !x in fun () ->
+            match y, !x with
+            | None, _ => () (* easy *)
+            | Some(n), None =>
+                (* The logical state never changes from Set(n). Impossible. *)
+                assert(false)
+            | Some(n), Some(m) =>
+                (* The logical state never changes from Set(n). n == m *)
+                assert(n == m)
+            end
+    }
+```
+\normalsize
+
+
+## Modeling the logical states of `mk_oneshot`
+* Unique token: Only the first execution of `c.try_set(v)` succeeds. The execution _consumes_ a unique token need for updating the logical state.
+    * The logical state never changes once it's set.
+* Broadcasting the message: The first executor consumes the token to generate & broadcast a message that the value is set to `v`.
+* Duplicable messages: Threads can keep a copy of the message and use it later.
+    * Models the record of the snapshot of the state.
+* Agreement of messages: The contents of the copy are the same.
+    * $n == m$
+
+## Formalizing the token & message model
+* Allocate a "logical" variable $\gamma$ and initialize it with the token for broadcasting.
+  $\ownGhost{\gamma}{\textsf{token}}$
+    * a fancy notation for $\gamma\mapsto\textsf{token}$, a.k.a. "ghost state"
+* The thread that first calls `c.try_set(v)` consumes the token to make a message $\textsf{msg}(v)$.
+  $\ownGhost{\gamma}{\textsf{token}}\vs\ownGhost{\gamma}{\textsf{msg}(v)}$
+* The message state is duplicable (to be precise, it's persistent). $\ownGhost{\gamma}{\textsf{msg}(v)}\vs\ownGhost{\gamma}{\textsf{msg}(v)}\ast\ownGhost{\gamma}{\textsf{msg}(v)}$
+* Any two messages agree on the value.
+  $V(\textsf{msg}(n)\cdot\textsf{msg}(m))\implies n=m$.
+    * $V(e)$ asserts that $e$ is a valid element.
+* If the message is broadcast, the value can't be updated.
+  $V(\textsf{msg}(n)\cdot\textsf{token})\implies \FALSE$.
+
+## Associating the logical state with the physical state
+* $x\mapsto\texttt{None}\ast\ownGhost{\gamma}{\textsf{token}}$
+* $x\mapsto\texttt{Some}(n)\ast\ownGhost{\gamma}{\textsf{msg}(n)}$
+
+Invariant?  All possible states and the association of physical & logical state.
+$$
+I\triangleq
+(x\mapsto\texttt{None}\ast\ownGhost{\gamma}{\textsf{token}}) \lor
+(\exists n.\ x\mapsto\texttt{Some}(n)\ast\ownGhost{\gamma}{\textsf{msg}(n)})
+$$
+
+* When the program updates the physical state $x\mapsto...$, the logical state $\ownGhost{\gamma}{...}$ should be updated($\vs$) accordingly in order to reestablish $I$.
+$$
+\infer[HOARE-VS] {
+    P\vs P'\\
+    \hoare{P'}{e}{v,Q'} \\
+    Q\vs Q'\\
+} {
+    \hoare{P}{e}{v,Q}
+}
+$$
+
+## Proof outline
+```ocaml
+let x = ref(None) in { try_set = ..., check = ... }
+```
+ Allocate the invariant $\knowInv{\namesp}{I\triangleq
+(x\mapsto\texttt{None}\ast\ownGhost{\gamma}{\textsf{token}}) \lor
+(\exists n.\ x\mapsto\texttt{Some}(n)\ast\ownGhost{\gamma}{\textsf{msg}(n)})
+}$
+```ocaml
+try_set = fun n -> CAS(x, None, Some(n))
+```
+ Open $\knowInv{\namesp}{I}$ and case analysis.
+
+* $x\mapsto\texttt{None}\ast\ownGhost{\gamma}{\textsf{token}}$:
+  `CAS` succeeds.
+  $\ownGhost{\gamma}{\textsf{token}}\vs\ownGhost{\gamma}{\textsf{msg}(v)}$
+* $\exists n.\ x\mapsto\texttt{Some}(n)\ast\ownGhost{\gamma}{\textsf{msg}(n)}$:
+  `CAS` fails.
+
+## Proof outline (`check`)
+\footnotesize
+```ocaml
+check = fun () -> let y = !x in
+  fun () -> match y with
+            | None => ()
+            | Some(n) => match !x with ... end
+```
+\normalsize
+ Open $\knowInv{\namesp}{I}$ and case analysis.
+
+* (Case 1) $x\mapsto\texttt{None}\ast\ownGhost{\gamma}{\textsf{token}}$: Done.
+* (Case 2) $\exists n.\ x\mapsto\texttt{Some}(n)\ast\ownGhost{\gamma}{\textsf{msg}(n)}$:
+    * physical snapshot $y\mapsto n$
+    * Keep the copy of $\ownGhost{\gamma}{\textsf{msg}(n)}$ by
+      $\ownGhost{\gamma}{\textsf{msg}(n)}\vs\ownGhost{\gamma}{\textsf{msg}(n)}\ast\ownGhost{\gamma}{\textsf{msg}(n)}$
+
+
+## Proof outline (`check`)
+$\left\{\knowInv{\namesp}{I}\ast y\mapsto n \ast \ownGhost{\gamma}{\textsf{msg}(n)}\right\}$
+\footnotesize
+```ocaml
+Some(n) => match !x with
+           | None => assert(false)
+           | Some(m) => assert(n == m)
+           end
+```
+\normalsize
+ Open $\knowInv{\namesp}{I}$ and case analysis.
+
+* (Case 2-1) $x\mapsto\texttt{None}\ast\ownGhost{\gamma}{\textsf{token}}$:
+    * We have $\textsf{msg}(n)\cdot\textsf{token}$. Contradiction.
+* (Case 2-2) $\exists m.\ x\mapsto\texttt{Some}(m)\ast\ownGhost{\gamma}{\textsf{msg}(m)}$:
+    * We have $\textsf{msg}(n)\cdot\textsf{msg}(m)$. So $n=m$.
+
+### Demo `oneshot.v`
+
+# Ghost States in Iris
+
+## Resource Algebra
+\todo
+
+## View shift
+\todo
+
+
 <!-- NOTE:
 * https://github.com/matze/mtheme
 * slide_level:2 -> all contents under at least 2 #'s

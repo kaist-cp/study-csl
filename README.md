@@ -1,4 +1,4 @@
-# Iris study group
+# Concurrent Separation Logic & Iris study group
 
 ## Slides
 * [pdf link](https://drive.google.com/file/d/1DuX5RWwhpTCHBSL7uGLxo3hU5Vk5KIHp/view?usp=sharing)
