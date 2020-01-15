@@ -142,10 +142,10 @@ Note
 * $P\ast Q\proves P\land Q$
 * $P\land Q\proves P\ast Q$ if $P$ _persistent_
 
+# Separation Logic of Iris
+
 ## Demo 1: POPL18 tutorial `exercises/ex_01_swap.v`
 <https://gitlab.mpi-sws.org/iris/tutorial-popl18>
-
-# Separation Logic of Iris
 
 ## Encoding of Hoare triples (a.k.a. [Texan triples](https://gitlab.mpi-sws.org/iris/iris/merge_requests/9#nomenclature))
 $$
@@ -244,6 +244,9 @@ resources required by $e$ are contained in $P$.
 # Concurrent Separation Logic: \ Invariants
 
 ## Invariant $\knowInv{\iota}{P}$
+See [lecture 9 (invariants) slides](https://iris-project.org/tutorial-pdfs/lecture9-invariants.pdf)
+
+### Summary
 * Shareable knowledge that there exists a resource satisfying $P$ (think: pointer)
 * To establish $\knowInv{\iota}{P}$, sacrifice $P$.
 * Use with care!
@@ -251,6 +254,11 @@ resources required by $e$ are contained in $P$.
     * The user should return $P$ to the $\knowInv{\iota}{P}$.
     * The user cannot access the same invariant at the same time (thus the name $\iota$ and mask $\mask$ are needed).
 
+# Invariants in Iris
+
+## Demo 2: coin flip
+<!-- <https://gitlab.mpi-sws.org/iris/examples/blob/master/theories/lecture_notes/coq_intro_example_1.v> -->
+<https://gitlab.mpi-sws.org/iris/tutorial-popl18/blob/master/talks/demo/part3.v>
 
 ## Invariant namespace $\namesp$
 * similar to the concept of namespace in programming
@@ -591,9 +599,10 @@ Some(n) => match !x with
 * (Case 2-2) $\exists m.\ x\mapsto\texttt{Some}(m)\ast\ownGhost{\gamma}{\textsf{msg}(m)}$:
     * We have $\textsf{msg}(n)\cdot\textsf{msg}(m)$. So $n=m$.
 
-### Demo `oneshot.v`
-
 # Ghost States in Iris
+
+## Demo 3: `oneshot.v`
+<https://github.com/kaist-cp/study-csl/blob/master/oneshot.v>
 
 ## Resource Algebra
 \todo
