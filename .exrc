@@ -1,21 +1,33 @@
 fun s:iris_stuff()
-    syn match texMathSymbol '\\proves' contained conceal cchar=⊢
-    syn match texMathSymbol '\\later' contained conceal cchar=⊳
-    syn match texMathSymbol '\\always' contained conceal cchar=□
-    syn match texMathSymbol '\\wand' contained conceal cchar=🍭
-    syn match texMathSymbol '\\ownGhost' contained conceal cchar=👻
-    syn match texMathSymbol '\\knowInv' contained conceal cchar=知
-
-    syn match texMathSymbol '\\vs' contained conceal cchar=⇛
-    syn match texMathSymbol '\\fpfn' contained conceal cchar=⇀
-
-    syn match texMathSymbol '\\E' contained conceal cchar=𝓔
-    syn match texMathSymbol '\\mask' contained conceal cchar=𝓔
-    syn match texMathSymbol '\\I' contained conceal cchar=𝓘
-    syn match texMathSymbol '\\N' contained conceal cchar=𝓝
-    syn match texMathSymbol '\\namesp' contained conceal cchar=𝓝
-    syn match texMathSymbol '\\mval' contained conceal cchar=𝓥
-    syn match texMathSymbol '\\mvalFull' contained conceal cchar=𝓥
+    let l:iris_conceal = [
+                \ ['proves', '⊢'],
+                \ ['later', '⊳'],
+                \ ['always', '□'],
+                \ ['wand', '🍭'],
+                \ ['ownGhost', '👻'],
+                \ ['knowInv', '知'],
+                \ ['authfull', '●'],
+                \ ['authfrag', '○'],
+                \ ['vs', '⇛'],
+                \ ['fpfn', '⇀'],
+                \ ['mupd', '⇝'],
+                \ ['la', '←'],
+                \ ['ra', '→'],
+                \ ['Ra', '⇒'],
+                \ ['Lra', '⇔'],
+                \ ['nequiv', '='],
+                \ ['E',  '𝓔'],
+                \ ['mask', '𝓔'],
+                \ ['expr', 'e'],
+                \ ['I',  '𝓘'],
+                \ ['N',  '𝓝'],
+                \ ['namesp', '𝓝'],
+                \ ['mval', '𝓥'],
+                \ ['mvalFull', '𝓥']]
+    for pair in l:iris_conceal
+        " NOTE: pair[0] =~# '\w$' should hold
+        exe "syn match texMathSymbol '\\\\".pair[0]."\\>' contained conceal cchar=".pair[1]
+    endfor
 endfun
 
 augroup iris_stuff

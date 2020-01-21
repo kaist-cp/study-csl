@@ -2,7 +2,7 @@
 title: An Overview of Concurrent Separation Logic and Iris
 author: Jaehwang Jung
 institute: KAIST CP
-date: "2019-12-31, 2020-01-07, 2020-01-14"
+date: "2019-12-31, 2020-01-07, 2020-01-14, 2020-01-21"
 theme: metropolis
 toc: true
 slide_level: 2
@@ -408,19 +408,21 @@ $$
 $$
 proof? why is this necessary and how is it difference from timeless stuff??  -->
 
-<!-- ground up figure 4 -->
-
-<!-- how to connect the result of timeless stuff to proof? ok to eliminate? frame-preseving update? -->
+<!--
+* ground up figure 4
+* how to connect the result of timeless stuff to proof?
+* vs elimination: wp-vup and wp-atomic
+-->
 
 
 # Concurrent Separation Logic: \ Ghost States
 
-## Today's Goal
+## `mk_oneshot`
 
 \footnotesize
 ```ocaml
 (* Example from "Iris from the ground up" section 2 *)
-mk_oneshot () = let x = ref(None) in
+let mk_oneshot () = let x = ref(None) in
 (* CAS(loc, cur, new): atomically Compare `!loc` and `cur`
    And Set it to `new` if they are the same *)
     { try_set = fun n -> CAS(x, None, Some(n)),
@@ -439,12 +441,12 @@ mk_oneshot () = let x = ref(None) in
 
 \normalsize
 
-## Today's Goal
+## `mk_oneshot`
 
 \footnotesize
 
 ```ocaml
-mk_oneshot () = let x = ref(None) in
+let mk_oneshot () = let x = ref(None) in
     { try_set = fun n -> CAS(x, None, Some(n)),
       check = fun () ->
         let y = !x in
@@ -480,7 +482,7 @@ $$
 ## High-level proof idea
 \scriptsize
 ```ocaml
-mk_oneshot () =
+let mk_oneshot () =
     let x = ref(None) in (* Initiate the logical state to NotSet *)
     { try_set = fun n ->
         CAS(x, None, Some(n)), (* Update the state to Set(n) *)
@@ -599,17 +601,206 @@ Some(n) => match !x with
 * (Case 2-2) $\exists m.\ x\mapsto\texttt{Some}(m)\ast\ownGhost{\gamma}{\textsf{msg}(m)}$:
     * We have $\textsf{msg}(n)\cdot\textsf{msg}(m)$. So $n=m$.
 
+## Resource Algebra (RA)
+Read "Ground up" Section 2.1, 3.1 and "Lecture notes" 7.4.
+
+### RA
+1. carrier set $M$
+2. validity $\mvalFull:M\to\mProp$
+3. (partial) core $\mcore{{-}}:M \to \maybe M$
+4. composition $(\cdot):M \times M \to M$
+* extension order $(\mincl)$
+* frame-preserving update
+
+### etc.
+* connection of the RA and the logic (ghost state rules)
+* view shifts
+
+
+## Today' Goal: concurrent counter
+```ocaml
+let newcounter () = ref 0
+let rec incr l =
+    let n = !l in
+    if CAS l n (n+1)
+    then ()
+    else incr l.
+let read l = !l.
+```
+
+
+Provide specifications for counter functions that can be used to prove
+$$
+\bigg\{\TRUE\bigg\}\quad
+\begin{array}{l}
+\texttt{let c = newcounter ();}\\
+\texttt{(incr c || incr c);}\\
+\texttt{read c}
+\end{array}\quad
+\bigg\{v,\ v=2\bigg\}
+$$
+
+## Key points
+* Problem 1: Sharing of $l\mapsto n$ among multiple threads.
+    * Use an invariant containing $\exists n.\ l\mapsto n$ with some ghost states.
+* Problem 2: Tracking increments of other threads.
+    * Take 1: Each thread tracks a lower bound(snapshot) of the counter value.
+        * When `incr` runs, both the actual value and the thread's snapshot increase by 1.
+        * A lower bound is a knowledge (can be duplicated).
+* Problem 3: Recursion in `incr`.
+    * Apply the spec of `incr` recursively??
+
+## Specification of the counter functions. Take 1.
+$$\hoare{\TRUE}{\texttt{newcounter()}}{l, \texttt{counter}(l)\ast \texttt{snapshot}(0)}$$
+\begin{gather*}
+\{\texttt{counter}(l)\ast\texttt{snapshot}(n)\}\\
+{\texttt{incr }l}\\
+\{(), \texttt{counter}(l)\ast \texttt{snapshot}(n+1)\}
+\end{gather*}
+\begin{gather*}
+\{\texttt{counter}(l)\ast\texttt{snapshot}(n)\}\\
+{\texttt{read }l}\\
+\{v, v\ge n \land \texttt{counter}(l)\ast \texttt{snapshot}(n)\}
+\end{gather*}
+
+## High-level proof idea for `incr`
+```ocaml
+let rec incr l =
+    (* open invariant, run, close, ....*)
+    let n = !l in
+    if CAS l n (n+1)
+    then ()      (* update the snapshot and return *)
+    else incr l. (* recursively apply the spec *)
+```
+
+## Formalizing the lower bound (snapshot) model
+* $\texttt{snapshot}(\gamma,n)=\ownGhost{\gamma}{\authfrag n}$ (_fragmental_ view)
+* a piece of ghost state $\ownGhost{\gamma}{\authfull m}$ (_authoritative view_) that is directly associated with the physical resource and interacts with the snapshots.
+    * $\texttt{counter}(\gamma,l)\triangleq \knowInv{\namesp}{\exists m.\ l\mapsto m\ast \ownGhost{\gamma}{\authfull m}}$
+* The snapshot is the lower bound of the _actual_ value.
+    * $\mval(\authfull m\cdot\authfrag n)\implies n\le m$
+* When `incr` runs, both the actual value and the thread's snapshot increase by 1.
+    * $\authfull m\cdot\authfrag n\mupd \authfull (m+1)\cdot\authfrag (n+1)$
+* The snapshot can be duplicated
+    * $\authfrag n\mupd \authfrag n\cdot\authfrag n$
+* The snapshot can be updated to newer value
+    * $\authfull m\cdot\authfrag n\mupd \authfull m\cdot\authfrag m$
+$$ \text{a.k.a.}\ \authm(\mathbb{N}_{\max}) $$
+
+
+## Proving Recursion
+Suppose we prove $\hoare{P}{e}{Q}$ where $e$ is recursive.
+
+* Can we just apply $\hoare{P}{e}{Q}$ for the recursive occurrences?
+    * NO: $(P\Ra P)\Ra P$. $(\FALSE\Ra\FALSE)\proves\FALSE$
+* Suppose $e$ terminates in $n$ steps. Then the recursive use of $e$ will terminate in at most $n-1$ steps.
+    * So it's actually OK to use the spec recursively, if we can express that the spec is applied at a _lower step index_. But we need the notion of reduction steps baked into the logic.
+* "later modality" $\later P$: $P$ holds from the next reduction step
+* Löb Introduction: $(\later P\Ra P)\proves P$
+* Note: Iris's assertions guarantee nothing about termination (_partial correctness_).
+
+## More on $\later$
+* Introduction
+    * $\later P$ is weaker than $P$. $P\proves\later P$ (`iNext`)
+    * Opening invariants
+* Elimination
+    * Reduction step. `wp_*` tactics automatically strip $\later$ in the context.
+    * Timeless propositions: most of innocent propositions like $l\mapsto v$ that don't refer to other invariants. `>ipat`.
+
+## So...
+Can you prove
+$$
+\bigg\{\TRUE\bigg\}\quad
+\begin{array}{l}
+\texttt{let c = newcounter ();}\\
+\texttt{(incr c || incr c);}\\
+\texttt{read c}
+\end{array}\quad
+\bigg\{v,\ v=2\bigg\}
+$$
+with this spec?
+\footnotesize
+$$\hoare{\TRUE}{\texttt{newcounter()}}{l, \texttt{counter}(l)\ast \texttt{snapshot}(0)}$$
+$$
+\hoare{\texttt{counter}(l)\ast\texttt{snapshot}(n)}
+{\texttt{incr }l}
+{(), \texttt{counter}(l)\ast \texttt{snapshot}(n+1)}
+$$
+$$
+\hoare{\texttt{counter}(l)\ast\texttt{snapshot}(n)}
+{\texttt{read }l}
+{v, v\ge n \land \texttt{counter}(l)\ast \texttt{snapshot}(n)}
+$$
+\normalsize
+
+No.
+
+Why? No meaningful interaction between snapshots.
+
+We need to combine the _contribution_ of each thread.
+
+## Take 2
+* Each thread holds a share of $\authfrag n$.
+    * fractional ownership $\authfrag(q,n)\ (0<q<1)$.
+    * full ownership $\authfrag(1, n)$: no other threads are accessing the counter
+* Instead of recording the lower bound, record the threads' contribution to the counter value which can be accumulated
+    * use the RA $\mathbb{N}_{(+)}$ instead of $\mathbb{N}_{\max}$
+
+$$\texttt{contrib}(\gamma,q,n)=\ownGhost{\gamma}{\authfrag(q,n)}$$
+$$
+\texttt{contrib}(\gamma,q_1+q_2, n_1+n_2) \provesIff
+\texttt{contrib}(\gamma,q_1,n_1)\ast\texttt{contrib}(\gamma,q_2, n_2)
+$$
+$$
+\text{a.k.a.}\ \authm(\maybe{(\mathbb{Q}_{01}\times\mathbb{N})})
+$$
+
+## new spec
+\footnotesize
+$$\hoare{\TRUE}{\texttt{newcounter()}}{l, \texttt{counter}(l)\ast \texttt{contrib}(1,0)}$$
+$$
+\hoare{\texttt{counter}(l)\ast\texttt{contrib}(q,n)}
+{\texttt{incr }l}
+{(), \texttt{counter}(l)\ast \texttt{contrib}(q,n+1)}
+$$
+$$
+\hoare{\texttt{counter}(l)\ast\texttt{contrib}(q,n)}
+{\texttt{read }l}
+{v, v\ge n \land \texttt{counter}(l)\ast \texttt{contrib}(q,n)}
+$$
+$$
+\hoare{\texttt{counter}(l)\ast\texttt{contrib}(1,n)}
+{\texttt{read }l}
+{v, v=n \land \texttt{counter}(l)\ast \texttt{contrib}(q,n)}
+$$
+\normalsize
+
+## But..
+```ocaml
+let rec incr l =
+    let n = !l in
+    if CAS l n (n+1)
+    then n  (* return the previous value *)
+    else incr l.
+```
+
+$$
+\bigg\{\TRUE\bigg\}\
+\begin{array}{l}
+\texttt{let c = newcounter ();}\\
+\texttt{(incr c || incr c)}\\
+\end{array}\ \left\{(v_1, v_2),
+\begin{array}{l}
+(v_1=0\land v_2=1)\lor\\(v_1=1\land v_2=0)
+\end{array}
+\right\}
+$$
+
 # Ghost States in Iris
 
-## Demo 3: `oneshot.v`
-<https://github.com/kaist-cp/study-csl/blob/master/oneshot.v>
-
-## Resource Algebra
-\todo
-
-## View shift
-\todo
-
+## Demo
+* `oneshot.v` <https://github.com/kaist-cp/study-csl/blob/master/oneshot.v>
+* `counter.v`<https://github.com/kaist-cp/study-csl/blob/master/counter.v>
 
 <!-- NOTE:
 * https://github.com/matze/mtheme
