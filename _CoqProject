@@ -6,3 +6,4 @@
 -arg -w -arg -ambiguous-paths
 
 oneshot.v
+counter.v
