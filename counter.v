@@ -163,8 +163,15 @@ Section mono_client.
   Proof.
     iIntros (Φ) "_ Post". wp_lam.
     wp_apply (newcounter_mono_spec N); first done.
-    (* exercise *)
-  Admitted.
+    iIntros (l) "H". iDestruct "H" as (γ) "[#Hinv #Hsnap0]".
+    wp_let.
+    wp_apply (wp_par (λ _, msnapshot γ 1) (λ _, msnapshot γ 1));
+      try (wp_apply (incr_mono_spec with "[$Hinv $Hsnap0]");
+             iIntros "[_ ?]"; iFrame).
+    iIntros (v1 v2) "[Hsnap1 _]". iNext. wp_seq.
+    wp_apply (read_mono_spec with "[$Hinv $Hsnap1]").
+    iIntros (i) "(% & _ & Hsnapi)". by iApply "Post".
+  Qed.
 End mono_client.
 
 (** Counter with contributions *)
@@ -297,6 +304,15 @@ Section contrib_client.
     iIntros (γ l) "[#Hinv Hfrag]".
     wp_let.
     rewrite <-Qp_half_half.
-    (* exercise *)
-  Admitted.
+    iDestruct (ccontrib_split γ (1/2) (1/2) 0 0 with "Hfrag") as "[Hfrag1 Hfrag2]".
+    wp_apply (wp_par (λ _, ccontrib γ (1/2) 1) (λ _, ccontrib γ (1/2) 1)
+                with "[Hfrag1] [Hfrag2]").
+    - wp_apply (incr_contrib_spec with "[$Hinv $Hfrag1]"); auto.
+    - wp_apply (incr_contrib_spec with "[$Hinv $Hfrag2]"); auto.
+    - iIntros (v1 v2) "[Hfrag1 Hfrag2]". iNext. wp_seq.
+      iDestruct (ccontrib_merge with "[$Hfrag1 $Hfrag2]") as "Hfrag". simpl.
+      rewrite Qp_half_half.
+      wp_apply (read_contrib_spec_1 N γ l 2 with "[$Hinv $Hfrag]").
+      iIntros "Hfrag". by iApply "Post".
+  Qed.
 End contrib_client.

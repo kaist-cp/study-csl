@@ -7,3 +7,4 @@
 
 oneshot.v
 counter.v
+par_incr.v
