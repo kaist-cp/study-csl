@@ -617,7 +617,7 @@ Read "Ground up" Section 2.1, 3.1 and "Lecture notes" 7.4.
 * view shifts
 
 
-## Today' Goal: concurrent counter
+## Concurrent counter
 ```ocaml
 let newcounter () = ref 0
 let rec incr l =
@@ -752,7 +752,7 @@ $$
 \texttt{contrib}(\gamma,q_1,n_1)\ast\texttt{contrib}(\gamma,q_2, n_2)
 $$
 $$
-\text{a.k.a.}\ \authm(\maybe{(\mathbb{Q}_{01}\times\mathbb{N})})
+\text{a.k.a.}\ \fracauthm(\mathbb{N})=\authm(\maybe{(\mathbb{Q}_{01}\times\mathbb{N})})
 $$
 
 ## new spec
@@ -775,7 +775,7 @@ $$
 $$
 \normalsize
 
-## But..
+## More precise description of `incr`?
 ```ocaml
 let rec incr l =
     let n = !l in
@@ -787,8 +787,8 @@ let rec incr l =
 $$
 \bigg\{\TRUE\bigg\}\
 \begin{array}{l}
-\texttt{let c = newcounter ();}\\
-\texttt{(incr c || incr c)}\\
+\texttt{let l = ref 0;}\\
+\texttt{(incr l || incr l)}\\
 \end{array}\ \left\{(v_1, v_2),
 \begin{array}{l}
 (v_1=0\land v_2=1)\lor\\(v_1=1\land v_2=0)
@@ -796,11 +796,167 @@ $$
 \right\}
 $$
 
-# Ghost States in Iris
+## Counter state machine
+3 states in the program, modeled as an invariant \pause
+$$
+\knowInv{\namesp}{l\mapsto 0 \lor l\mapsto 1\lor l\mapsto 2}
+$$ \pause
+
+## Counter state machine
+Each thread updates different states (so they return different values) \pause
+
+* Let the state machine maintain a set of **unique** receipts. Receipt $n$ is passed to the thread that updates the state $l\mapsto n$ to $l\mapsto n+1$. \pause
+$$
+(l\mapsto 0)\xrightarrow{\text{output }\ownGhost{receipt}{\{0\}}}
+(l\mapsto 1)\xrightarrow{\text{output }\ownGhost{receipt}{\{1\}}}
+(l\mapsto 2)
+$$ \pause
+$$
+I\triangleq\knowInv{\namesp}{
+    (l\mapsto 0 \ast \ownGhost{receipt}{\{0,1\}})\lor
+    (l\mapsto 1 \ast \ownGhost{receipt}{\{1\}})\lor
+    (l\mapsto 2)}
+$$ \pause
+* Associate the return values with receipts.
+* In the proof, each thread will receive $\exists n.\ \ownGhost{receipt}{\{n\}}$. \pause
+* In order for $\ownGhost{receipt}{\{n_1\}}\ast\ownGhost{receipt}{\{n_2\}}$ to be valid, $n_1\neq n_2$.
+  (RA $\pset{\mathbb{N}}_{\cupdot}$)
+
+## Counter state machine
+No thread can observe $l\mapsto 2$. (total number of increment is 2) \pause
+
+* State update costs one fungible coin. There are 2 such coins in the system. \pause
+$$
+(l\mapsto 0)\xrightarrow[\text{input }\ownGhost{coin}{1/2}]{\text{output }\ownGhost{receipt}{\{0\}}}
+(l\mapsto 1)\xrightarrow[\text{input }\ownGhost{coin}{1/2}]{\text{output }\ownGhost{receipt}{\{1\}}}
+(l\mapsto 2)
+$$
+\small
+$$ \pause
+\mkern-80mu % TODO: do it properly
+I\triangleq\knowInv{\namesp}{
+    (l\mapsto 0 \ast \ownGhost{receipt}{\{0,1\}})\lor
+    (l\mapsto 1 \ast \ownGhost{receipt}{\{1\}} \ast\ownGhost{coin}{1/2})\lor
+    (l\mapsto 2 \ast\ownGhost{coin}{2/2})}
+$$ \pause
+\normalsize
+
+* Each thread is given one coin at the beginning. \pause
+* Since $\ownGhost{coin}{2/2}\ast\ownGhost{coin}{1/2}$ is invalid, threads cannot observe $l\mapsto 2$. (RA $\mathbb{Q}_{01}$)
+
+## Spec of each thread
+$$ \mkern-18mu
+\knowInv{\namesp}{I}\proves
+\hoare
+    {\ownGhost{coin}{1/2}}
+    {\texttt{incr l}}
+    {v,\ (v=0\ast \ownGhost{receipt}{\{0\}})\lor
+        (v=1\ast \ownGhost{receipt}{\{1\}})}
+$$
+You can prove this spec as usual. (similar to the 'oneshot' example)
+
+* Unfold the definition of `incr`.
+* Open/close the invariant at each impure step and rule out the invalid states.
+* Update the physical state ($l\mapsto v$) and ghost states (coin and receipt) on the successful `CAS`.
+
+\pause But this process will get unmanageable for more complex programs.
+So we want to give `incr` a general spec that can be used for proving the above spec.
+
+## Property of `incr`
+$$ \hoare{l\mapsto n}{\texttt{incr l}}{n,\ l\mapsto n+1} $$
+Obviously this spec doesn't work because \pause
+
+* it needs the exclusive ownership of $l\mapsto v$ (no concurrent access); \pause
+*
+    ```ocaml
+    incr_seq l = fun x -> let v = !x; x <- v+1; v
+    ```
+    also satisfies the spec, \pause and it may fail to increment when run concurrently. \pause
+
+The key observation is that the moment that the effect of increment takes effect is when the `CAS` succeeds.
+
+So concurrent executions of `incr l` behaves as some linear sequence of atomic increment operation (linearizability).
+
+## Logically atomic triples
+So it makes sense to be able to open invariants around `incr l`. \pause
+
+Iris provides **logically atomic triples** to express this property.
+$$ \ahoare{n.\ l\mapsto n}{\texttt{incr l}}{n,\ l\mapsto n+1} $$
+<!-- meas that $l\mapsto n$ is given to the **linearization point** (successful `CAS`) of `incr l`, which updates it to $l\mapsto n+1$. -->
+You can open invariants around the logically atomic triples.
+$$
+\infer[logatom-inv]
+    { \ahoare{\later I\ast P}{e}{v,\later I\ast Q}[\mask\setminus\namesp] }
+    { \knowInv{\namesp}{I}\proves\ahoare{P}{e}{Q}[\mask] }
+$$
+
+
+## Logically atomic triples
+To prove that an expression is logically atomic, first you need to identify the **linearization point**.
+And then, you should prove that the linearization point transforms $P$ to $Q$. \pause
+$$
+\infer[logatom-intro]
+    { \forall\Phi. \hoare{\AU{P,Q}(\Phi)}{e}{\Phi} }
+    { \ahoare{P}{e}{Q} }
+$$
+$\AU{P,Q}(\Phi)$ is a resource called 'atomic update' which denotes the right and obligation to update the resource (from $P$ to $Q$).
+ \pause
+<!-- The precondition $P$ is only accessible via $\AU{P,Q}(\Phi)$. \pause -->
+
+* At the linearization point, you should update $P$ to $Q$ and $\AU{P,Q}(\Phi)$ is consumed (commit).
+* You can still access $P$ via even if you're not at the linearization point unless you don't modify it (abort).
+
+
+## Logically atomic triples
+You can use the logically atomic triple to prove the normal Hoare triple. \pause
+$$
+\infer[logatom-seq] {
+    \ahoare{P}{e}{Q}\\
+    \laterable{P}
+} { \hoare{P}{e}{Q} }
+$$ \pause
+
+### More info on logical atomicity in Iris
+* <https://people.mpi-sws.org/~jung/iris/logatom-talk-2019.pdf>
+* <https://plv.mpi-sws.org/prophecies> section 4
+* `iris/theories/program_logic/atomic.v`
+
+## Proof outlines
+$$ \ahoare{n.\ l\mapsto n}{\texttt{incr l}}{n,\ l\mapsto n+1} $$
+Proof. \pause Apply \fakeruleref{logatom-intro}. The linearization point is the successful `CAS`. \pause
+$$ \mkern-18mu
+\knowInv{\namesp}{I}\proves
+\hoare
+    {\ownGhost{coin}{1/2}}
+    {\texttt{incr l}}
+    {v,\ (v=0\ast \ownGhost{receipt}{\{0\}})\lor
+        (v=1\ast \ownGhost{receipt}{\{1\}})}
+$$
+Proof. \pause \fakeruleref{logatom-seq}, then \fakeruleref{logatom-inv}, case analysis. \pause
+$$
+\bigg\{\TRUE\bigg\}\
+\begin{array}{l}
+\texttt{let l = ref 0;}\\
+\texttt{(incr l || incr l)}\\
+\end{array}\ \left\{(v_1, v_2),
+\begin{array}{l}
+(v_1=0\land v_2=1)\lor\\(v_1=1\land v_2=0)
+\end{array}
+\right\}
+$$
+Proof. \pause Allocate invariants (with receipts) and distribute coins to each thread. Then apply the `incr` thread spec. Combine the postconditions and case analysis.
+
 
 ## Demo
 * `oneshot.v` <https://github.com/kaist-cp/study-csl/blob/master/oneshot.v>
-* `counter.v`<https://github.com/kaist-cp/study-csl/blob/master/counter.v>
+* `counter.v` <https://github.com/kaist-cp/study-csl/blob/master/counter.v>
+* `par_incr.v` <https://github.com/kaist-cp/study-csl/blob/master/par_incr.v>
+
+## Other topics
+* prophecy variables (needed for proof of linearizability in some cases)
+* cancellable invariants (extensively used in RustBelt to model resource reclamation)
+* higher-order ghost states (...)
+
 
 <!-- NOTE:
 * https://github.com/matze/mtheme

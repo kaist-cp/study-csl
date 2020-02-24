@@ -116,7 +116,7 @@ Section increment_client.
           rewrite frac_op' Qp_half_half. iFrame. }
         iRight. by iFrame.
     - iDestruct (own_valid_2 γ with "Hc' Hc") as %H.
-      rewrite frac_op' in H. rewrite ->frac_valid' in H.
+      rewrite frac_op' in H. rewrite ->frac_valid' in H. (* NOTE: https://coq.inria.fr/refman/proof-engine/ssreflect-proof-language.html#compatibility-issues *)
       by apply Qp_not_plus_q_ge_1 in H.
   Qed.
 
@@ -147,6 +147,31 @@ Section increment_client.
        let: "l" := ref #0 in (incr "l" ||| incr "l");; !"l"
     {{{ RET #2; True }}}.
   Proof.
-    (* exercise: prove using incr_thread *)
-  Admitted.
+    iIntros (Φ) "_ Post".
+    wp_alloc l as "Hl". wp_pures.
+    iMod new_recept as (γ0) "Hr0".
+    iMod new_recept as (γ1) "Hr1".
+    iMod new_coin as (γ) "[Hc1 Hc2]".
+    iMod (inv_alloc nroot _ (incr_inv γ0 γ1 γ l) with "[Hl Hr0 Hr1]") as "#Hinv".
+    { iNext; iLeft; iFrame. }
+    wp_apply (wp_par with "[Hc1] [Hc2]").
+    - iApply (incr_thread with "Hinv Hc1").
+    - iApply (incr_thread with "Hinv Hc2").
+    - iIntros (v1 v2) "[[[_ Hl0]|[_ Hl1]] [[_ Hr0]|[_ Hr1]]] !>"; wp_seq.
+      + iDestruct (own_valid_2 with "Hl0 Hr0") as %[].
+      + iInv nroot as ">[[Hl [Hr0 Hr1']] | [(Hl & Hr1' & Hc) | [Hl Hc]]]" "Hclose".
+        * iDestruct (own_valid_2 with "Hl0 Hr0") as %[].
+        * iDestruct (own_valid_2 with "Hr1 Hr1'") as %[].
+        * wp_load. iMod ("Hclose" with "[Hl Hc]") as "_".
+          { iNext. iRight. iRight. iFrame. }
+          iModIntro. by iApply "Post".
+      + iInv nroot as ">[[Hl [Hr0' Hr1]] | [(Hl & Hr1 & Hc) | [Hl Hc]]]" "Hclose".
+        * iDestruct (own_valid_2 with "Hr0 Hr0'") as %[].
+        * iDestruct (own_valid_2 with "Hl1 Hr1") as %[].
+        * wp_load. iMod ("Hclose" with "[Hl Hc]") as "_".
+          { iNext. iRight. iRight. iFrame. }
+          iModIntro. by iApply "Post".
+      + iDestruct (own_valid_2 with "Hl1 Hr1") as %[].
+  Qed.
 End increment_client.
+(* TODO: derive ccounter *)
